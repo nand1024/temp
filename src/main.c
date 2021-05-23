@@ -15,7 +15,7 @@
 uint16_t pwmH_High = 22;
 uint16_t pwmH_Low = 19;
 
-uint16_t pwmL_High = 11;
+uint16_t pwmL_High = 13;
 uint16_t pwmL_Low = 26;
 
 uint16_t pwmH_period = 22 + 19;
@@ -49,7 +49,7 @@ void init_gpio()
 	GPIOA->CRL &= ~GPIO_CRL_CNF6_Msk;
 	GPIOA->CRL |= GPIO_CRL_CNF6_1;
 
-	GPIOA->CRL |= GPIO_CRL_MODE5_1;
+	GPIOA->CRL |= GPIO_CRL_MODE5;
 	GPIOA->CRL &= ~GPIO_CRL_CNF5_Msk;
 }
 
@@ -57,18 +57,18 @@ void init_timer_pwm()
 {
 	RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
 	TIM3->CR1 |= (TIM_CR1_ARPE | TIM_CR1_CEN);
-	TIM3->DIER |= TIM_DIER_UIE;
-	TIM3->CCMR1 |= TIM_CCMR1_OC1M;
+	TIM3->DIER |= (TIM_DIER_CC1IE);
+	TIM3->CCMR1 |= (TIM_CCMR1_OC1M|TIM_CCMR1_OC1PE);
 	TIM3->CCER |= (TIM_CCER_CC1E | TIM_CCER_CC1P);
 	TIM3->CCR1 = 0;
-	TIM3->PSC = 1;
-	TIM3->ARR = 41;
+	TIM3->PSC = 0;
+	TIM3->ARR = 39;
 
 	NVIC_EnableIRQ(TIM3_IRQn);
 }
 
-void setPwm(uint8_t val){
-	TIM3->ARR = val ? pwmH_period : pwmL_period;
+void setPwm(uint32_t val){
+	//TIM3->ARR = val ? pwmH_period : pwmL_period;
 	TIM3->CCR1 = val ? pwmH_High : pwmL_High;
 }
 
@@ -86,12 +86,12 @@ int main(void)
 }
 
 void TIM3_IRQHandler(){
-	static uint8_t x = 23;
-	static uint8_t switcher = 1;
+	static uint8_t x = 1;
+	static uint8_t switcher = 24;
 	static uint8_t rgb_select = 0;
 	static uint8_t ind = 0;
-	if(TIM3->SR & TIM_SR_UIF){
-		TIM3->SR &= ~TIM_SR_UIF;
+	if(TIM3->SR & TIM_SR_CC1IF){
+		TIM3->SR &= ~TIM_SR_CC1IF;
 		/*
 		if(x == 0){
 			switch(rgb_select){
@@ -118,21 +118,23 @@ void TIM3_IRQHandler(){
 			x--;
 		}
 		*/
-		if(switcher){
-			setPwm(65536 & (((uint32_t)1) << x));
-		}else{
-			setPwm(0);
-		}
+
 		if(x == 0){
 			if(switcher == 1){
 				switcher = 0;
-				x =100;
+				x = 50;
 			}else{
 				switcher = 1;
 				x = 23;
 			}
 		}else{
 			x--;
+		}
+
+		if(switcher){
+			setPwm(1 & (((uint32_t)1) << x));
+		}else{
+			TIM3->CCR1 = 0;
 		}
 	}
 }
